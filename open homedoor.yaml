@@ -1,0 +1,91 @@
+blueprint:
+  name: Türen öffnen
+  description: Öffnet die Haustür und Wohnungstür bei Ankunft
+  domain: automation
+  input:
+    arrival_sensor:
+      name: Ankunft Sensoren
+      description: Sensoren, die den Ankunftsstatus überwachen
+      selector:
+        entity:
+          multiple: true
+          domain: sensor
+
+    open_permission_notification:
+      name: Benachrichtigung für Öffnungsanfrage
+      description: Benachrichtigung, die gesendet wird, um die Erlaubnis zum Öffnen der Türen zu fragen
+      selector:
+        entity:
+          domain: notify
+
+    door_lock_herlocked:
+      name: Wohnungstür Schloss
+      description: Bezeichner für die Wohnungstür
+      selector:
+        entity:
+          domain: lock
+
+    door_lock_front:
+      name: Haustür Schloss
+      description: Bezeichner für die Haustür
+      selector:
+        entity:
+          domain: lock
+
+trigger:
+  - platform: state
+    entity_id: !input arrival_sensor
+    from: 'towards'
+    to: 'arrived'
+
+condition:
+  - condition: or
+    conditions:
+      - condition: state
+        entity_id: !input door_lock_front
+        state: 'unlocked'
+      - condition: state
+        entity_id: !input door_lock_herlocked
+        state: 'unlocked'
+
+action:
+  - service: !input open_permission_notification
+    data:
+      message: "Möchtest du, dass ich die Türen öffne? (Geht 5 Min.)"
+      title: "Bitte gedrückt halten!"
+  
+  - wait_for_trigger:
+      - platform: event
+        event_type: mobile_app_notification_action
+        event_data:
+          action: "OPEN"
+
+  - choose:
+      - conditions:
+          - condition: state
+            entity_id: !input door_lock_herlocked
+            state: 'unlocked'
+        sequence:
+          - service: lock.lock
+            target:
+              entity_id: !input door_lock_herlocked
+          - delay: "00:00:04"
+          - service: lock.unlock
+            target:
+              entity_id: !input door_lock_herlocked
+
+      - conditions:
+          - condition: state
+            entity_id: !input door_lock_front
+            state: 'unlocked'
+        sequence:
+          - service: lock.lock
+            target:
+              entity_id: !input door_lock_front
+          - delay: "00:00:04"
+          - service: lock.unlock
+            target:
+              entity_id: !input door_lock_front
+
+mode: parallel
+max: 2
