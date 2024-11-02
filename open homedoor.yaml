@@ -1,6 +1,6 @@
 blueprint:
-  name: Türen öffnen
-  description: Öffnet die Haustür und Wohnungstür bei Ankunft
+  name: Haustür öffnen
+  description: Öffnet die Haustür bei Ankunft
   domain: automation
   input:
     arrival_sensor:
@@ -13,17 +13,10 @@ blueprint:
 
     open_permission_notification:
       name: Benachrichtigung für Öffnungsanfrage
-      description: Benachrichtigung, die gesendet wird, um die Erlaubnis zum Öffnen der Türen zu fragen
+      description: Benachrichtigung, die gesendet wird, um die Erlaubnis zum Öffnen der Tür zu fragen
       selector:
-        entity:
-          domain: notify
-
-    door_lock_herlocked:
-      name: Wohnungstür Schloss
-      description: Bezeichner für die Wohnungstür
-      selector:
-        entity:
-          domain: lock
+        device:
+          integration: mobile_app  # Oder notify, je nach Verwendung
 
     door_lock_front:
       name: Haustür Schloss
@@ -35,25 +28,26 @@ blueprint:
 trigger:
   - platform: state
     entity_id: !input arrival_sensor
-    from: 'towards'
-    to: 'arrived'
+    from: "towards"
+    to: "arrived"
 
 condition:
-  - condition: or
-    conditions:
-      - condition: state
-        entity_id: !input door_lock_front
-        state: 'unlocked'
-      - condition: state
-        entity_id: !input door_lock_herlocked
-        state: 'unlocked'
+  - condition: state
+    entity_id: !input door_lock_front
+    state: "unlocked"
 
 action:
-  - service: !input open_permission_notification
+  - service: notify.mobile_app_your_device_name  # Ersetze durch den tatsächlich verfügbaren Notify-Service
     data:
-      message: "Möchtest du, dass ich die Türen öffne? (Geht 5 Min.)"
+      message: "Möchtest du, dass ich die Haustür öffne? (Geht 5 Min.)"
       title: "Bitte gedrückt halten!"
-  
+      data:
+        actions:
+          - action: "OPEN"
+            title: "Öffnen"
+          - action: "NO"
+            title: "Nein"
+
   - wait_for_trigger:
       - platform: event
         event_type: mobile_app_notification_action
@@ -63,26 +57,10 @@ action:
   - choose:
       - conditions:
           - condition: state
-            entity_id: !input door_lock_herlocked
-            state: 'unlocked'
-        sequence:
-          - service: lock.lock
-            target:
-              entity_id: !input door_lock_herlocked
-          - delay: "00:00:04"
-          - service: lock.unlock
-            target:
-              entity_id: !input door_lock_herlocked
-
-      - conditions:
-          - condition: state
             entity_id: !input door_lock_front
-            state: 'unlocked'
+            state: "unlocked"
         sequence:
-          - service: lock.lock
-            target:
-              entity_id: !input door_lock_front
-          - delay: "00:00:04"
+          # Hier wird die Haustür einfach entriegelt
           - service: lock.unlock
             target:
               entity_id: !input door_lock_front
